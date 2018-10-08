@@ -1,0 +1,4 @@
+#AMAZON 1st PAGE
+https://www.amazon.com.br/b/ref=s9_acsd_hfnv_hd_bw_bJSvnS7_ct_x_ct00_w?_encoding=UTF8&node=17834350011&pf_rd_m=A1ZZFT5FULY4LN&pf_rd_s=merchandised-search-4&pf_rd_r=T2RDSSCXXY3RP0F6JBEB&pf_rd_t=101&pf_rd_p=964b3820-109b-50df-9e2a-74eeb6751e8f&pf_rd_i=17834036011
+"<a class=\"a-link-normal s-access-detail-page  s-color-twister-title-link a-text-normal\" title=\"([^\"]+[\"]) href=\"([^\"]+[\"])"
+(https://.+)(?=\")
