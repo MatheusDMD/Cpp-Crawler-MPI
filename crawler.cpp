@@ -7,6 +7,7 @@
 #include <list>
 #include <tuple>
 #include <thread>
+#include <chrono>
 #include "Semaphore.cpp"
 using json = nlohmann::json;
 #define NUM_THREADS_PRODUCERS 5
@@ -194,13 +195,6 @@ int main(int argc, char** argv) {
     //CREATE THREADS
     std::thread itemLinkCollector(getItemLinksFromCategory, std::ref(item_links), std::ref(isLinkCollectorDone), std::ref(accessItemList), std::ref(availableItemList), std::ref(website), std::ref(url), std::ref(item_regex), std::ref(href_regex), std::ref(next_page_regex), std::ref(replace_step_regex));
 
-    // for(auto i = 0; i < num_producers; i++){
-    //     std::thread itemPageCollector(getItemPagesFromLinks, std::ref(item_links), std::ref(num_producers), std::ref(isPageCollectorDone), std::ref(isLinkCollectorDone), std::ref(item_pages),  std::ref(accessItemList), std::ref(availableItemList),  std::ref(accessPageList), std::ref(availablePageList));
-    // }
-    // for(auto i = 0; i < num_consumers; i++){
-    //     std::thread itemInfoCollector(getItemInfoFromItemPage, std::ref(res), std::ref(num_consumers), std::ref(isPageCollectorDone), std::ref(item_pages), std::ref(accessPageList), std::ref(availablePageList), std::ref(info_page_regex));
-    // }
-
     for(int i = 0; i < num_producers; i++){
         producer_threads[i] = std::thread(getItemPagesFromLinks, std::ref(item_links), std::ref(num_producers), std::ref(isPageCollectorDone), std::ref(isLinkCollectorDone), std::ref(item_pages),  std::ref(accessItemList), std::ref(availableItemList),  std::ref(accessPageList), std::ref(availablePageList));
     }
@@ -217,11 +211,6 @@ int main(int argc, char** argv) {
     for (int i = 0; i < num_consumers; ++i) {
         consumer_threads[i].join();
     }        
-
-
-    // itemPageCollector.join();
-
-    // itemInfoCollector.join();
 
     return 0;
 }
