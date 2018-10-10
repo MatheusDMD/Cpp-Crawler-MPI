@@ -12,9 +12,18 @@
 using json = nlohmann::json;
 #define NUM_THREADS_PRODUCERS 5
 #define NUM_THREADS_CONSUMERS 1
+#define SUBMARINO  "www.submarino.com.br"
+#define AMERICANAS "www.americanas.com.br"
 
 // ("<a class=\"a-link-normal s-access-detail-page  s-color-twister-title-link a-text-normal\"");
 typedef std::tuple<std::string, int,std::regex> itemRegexType;
+
+bool isURLSupported(std::string website){
+    bool isSupported = false;
+    if(website == SUBMARINO || website == AMERICANAS)
+        isSupported = true;
+    return isSupported;
+}
 
 std::string getPage(std::string url){
     auto response = cpr::Get(cpr::Url{url});
@@ -56,21 +65,60 @@ std::string getNextPageLink(std::string page, std::regex next_page_regex, std::r
 }
 
 std::list<itemRegexType> getItemInfoRegex(std::string website){
-    //get values from file!
-    std::regex name_regex("<h1 class=\"product-name\">([^<]+)</h1>");
-    // std::regex description_regex("<body onload=\"resizeIframe\((.*)\);\" onresize=\"resizeIframe\((.*)\);\">((.|\n)+(</body>))"); 
-    std::regex photo_url_regex("<img class=\"swiper-slide-img\" alt=\"(.+)\" src=\"([^\"]+)\"");
-    std::regex price_regex("<p class=\"sales-price\">([^<]+)</p>");
-    std::regex installments_price_regex("<p class=\"payment-option payment-option-rate\">([^<]+)</p>");
-    std::tuple<std::string,std::string,std::regex>("name", ">", name_regex);
+    std::regex name_regex;
+    std::regex description_regex;
+    std::regex photo_url_regex;
+    std::regex price_regex;
+    std::regex installments_price_regex;
+
+    if(website == SUBMARINO){
+        name_regex               = std::regex("<h1 class=\"product-name\">([^<]+)</h1>");
+        description_regex        = std::regex("<div><noframes>((.|\n)+)</noframes><iframe"); 
+        photo_url_regex          = std::regex("<img class=\"swiper-slide-img\" alt=\"(.+)\" src=\"([^\"]+)\"");
+        price_regex              = std::regex("<p class=\"sales-price\">([^<]+)</p>");
+        installments_price_regex = std::regex("<p class=\"payment-option payment-option-rate\">([^<]+)</p>");
+    }else if(website == AMERICANAS){
+        name_regex               = std::regex("<h1 class=\"product-name\">([^<]+)</h1>");
+        description_regex        = std::regex("<div><noframes>((.|\n)+)</noframes><iframe"); 
+        photo_url_regex          = std::regex("<img class=\"swiper-slide-img\" alt=\"(.+)\" src=\"([^\"]+)\"");
+        price_regex              = std::regex("<p class=\"sales-price\">([^<]+)</p>");
+        installments_price_regex = std::regex("<p class=\"payment-option payment-option-rate\">([^<]+)</p>");
+    }
     std::list<itemRegexType> info_regex = {
         itemRegexType("name",1, name_regex),
-        // itemRegexType("description",">",description_regex),
+        itemRegexType("description",1,description_regex),
         itemRegexType("photo_url", 2, photo_url_regex),
         itemRegexType("price", 1, price_regex),
         itemRegexType("installments_price", 1, installments_price_regex),
     };
     return info_regex;
+}
+
+std::vector<std::regex> getPagesRegex(std::string website){
+    std::regex item_regex;
+    std::regex next_page_regex;
+    std::regex replace_step_regex;
+    std::regex href_regex;
+    
+    if(website == SUBMARINO){
+        item_regex         = std::regex("<a class=\"card-product-url\" href=\"([^\"]+[\"])");
+        next_page_regex    = std::regex("<li class=\"\"><a href=\"([^<]+)\"><span aria-label=\"Next\">");
+        replace_step_regex = std::regex("amp;");
+        href_regex         = std::regex("(/produto/.+)(?=\")");
+    }else if(website == AMERICANAS){
+        item_regex         = std::regex("<a class=\"card-product-url\" href=\"([^\"]+[\"])");
+        next_page_regex    = std::regex("<li class=\"\"><a href=\"([^<]+)\"><span aria-label=\"Next\">");
+        replace_step_regex = std::regex("amp;");
+        href_regex         = std::regex("(/produto/.+)(?=\")");
+    }
+
+    std::vector<std::regex> page_regex = {
+        item_regex,
+        next_page_regex,
+        replace_step_regex,
+        href_regex,
+    };
+    return page_regex;
 }
 
 void getItemLinksFromCategory(std::list<std::string>& item_links, bool& isLinkCollectorDone, Semaphore& accessItemList, Semaphore& availableItemList, std::string& website, std::string& url, std::regex& item_regex, std::regex& href_regex, std::regex& next_page_regex, std::regex& replace_step_regex){
@@ -176,41 +224,48 @@ int main(int argc, char** argv) {
     std::string url = argv[1];
     json res;
     //get from choosen website regex file
-    std::regex item_regex("<a class=\"card-product-url\" href=\"([^\"]+[\"])");
-    std::regex next_page_regex("<li class=\"\"><a href=\"([^<]+)\"><span aria-label=\"Next\">");
-    std::regex replace_step_regex("amp;");
-    std::regex href_regex("(/produto/.+)(?=\")");
+
     std::regex website_regex("https://(([^/]+))/");
-
     std::string website = getValueFromString(url, website_regex);
-    std::list<itemRegexType> info_page_regex = getItemInfoRegex(website);
-    website = "https://" + website;
+    if(isURLSupported(website)){
+        std::cout << website << " - \033[1;32m URL supported\033[0m" << std::endl;
 
-    if(std::getenv("NUM_THREADS_PRODUCERS")) num_producers = atoi(std::getenv("NUM_THREADS_PRODUCERS"));
-    if(std::getenv("NUM_THREADS_CONSUMERS")) num_consumers = atoi(std::getenv("NUM_THREADS_CONSUMERS"));
+        std::vector<std::regex> page_regex = getPagesRegex(website);
+        std::regex item_regex = page_regex[0];
+        std::regex next_page_regex = page_regex[1];
+        std::regex replace_step_regex = page_regex[2];
+        std::regex href_regex = page_regex[3];
+        std::list<itemRegexType> info_page_regex = getItemInfoRegex(website);
+        website = "https://" + website;
 
-    std::thread producer_threads[num_producers];
-    std::thread consumer_threads[num_consumers];
+        if(std::getenv("NUM_THREADS_PRODUCERS")) num_producers = atoi(std::getenv("NUM_THREADS_PRODUCERS"));
+        if(std::getenv("NUM_THREADS_CONSUMERS")) num_consumers = atoi(std::getenv("NUM_THREADS_CONSUMERS"));
 
-    //CREATE THREADS
-    std::thread itemLinkCollector(getItemLinksFromCategory, std::ref(item_links), std::ref(isLinkCollectorDone), std::ref(accessItemList), std::ref(availableItemList), std::ref(website), std::ref(url), std::ref(item_regex), std::ref(href_regex), std::ref(next_page_regex), std::ref(replace_step_regex));
+        std::thread producer_threads[num_producers];
+        std::thread consumer_threads[num_consumers];
 
-    for(int i = 0; i < num_producers; i++){
-        producer_threads[i] = std::thread(getItemPagesFromLinks, std::ref(item_links), std::ref(num_producers), std::ref(isPageCollectorDone), std::ref(isLinkCollectorDone), std::ref(item_pages),  std::ref(accessItemList), std::ref(availableItemList),  std::ref(accessPageList), std::ref(availablePageList));
+        //CREATE THREADS
+        std::thread itemLinkCollector(getItemLinksFromCategory, std::ref(item_links), std::ref(isLinkCollectorDone), std::ref(accessItemList), std::ref(availableItemList), std::ref(website), std::ref(url), std::ref(item_regex), std::ref(href_regex), std::ref(next_page_regex), std::ref(replace_step_regex));
+
+        for(int i = 0; i < num_producers; i++){
+            producer_threads[i] = std::thread(getItemPagesFromLinks, std::ref(item_links), std::ref(num_producers), std::ref(isPageCollectorDone), std::ref(isLinkCollectorDone), std::ref(item_pages),  std::ref(accessItemList), std::ref(availableItemList),  std::ref(accessPageList), std::ref(availablePageList));
+        }
+        for(int i = 0; i < num_consumers; i++){
+            consumer_threads[i] = std::thread(getItemInfoFromItemPage, std::ref(res), std::ref(num_consumers), std::ref(isPageCollectorDone), std::ref(item_pages), std::ref(accessPageList), std::ref(availablePageList), std::ref(info_page_regex));
+        }
+
+        //JOIN THREADS
+        itemLinkCollector.join();
+
+        for (int i = 0; i < num_producers; ++i) {
+            producer_threads[i].join();
+        }      
+        for (int i = 0; i < num_consumers; ++i) {
+            consumer_threads[i].join();
+        }        
+    }else{
+        std::cout << "URL not supported" << std::endl;
     }
-    for(int i = 0; i < num_consumers; i++){
-        consumer_threads[i] = std::thread(getItemInfoFromItemPage, std::ref(res), std::ref(num_consumers), std::ref(isPageCollectorDone), std::ref(item_pages), std::ref(accessPageList), std::ref(availablePageList), std::ref(info_page_regex));
-    }
-
-    //JOIN THREADS
-    itemLinkCollector.join();
-
-    for (int i = 0; i < num_producers; ++i) {
-        producer_threads[i].join();
-    }      
-    for (int i = 0; i < num_consumers; ++i) {
-        consumer_threads[i].join();
-    }        
 
     return 0;
 }
