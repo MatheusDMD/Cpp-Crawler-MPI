@@ -18,6 +18,10 @@
         "charconv": "cpp",
         "cuchar": "cpp",
         "string": "cpp",
-        "vector": "cpp"
+        "vector": "cpp",
+        "ostream": "cpp",
+        "array": "cpp",
+        "utility": "cpp",
+        "__functional_base": "cpp"
     }
 }
