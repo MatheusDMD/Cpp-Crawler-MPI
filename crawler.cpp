@@ -9,7 +9,8 @@
 #include <thread>
 #include "Semaphore.cpp"
 using json = nlohmann::json;
-#define NUM_THREAD 5
+#define NUM_THREADS_PRODUCERS 5
+#define NUM_THREADS_CONSUMERS 1
 
 // ("<a class=\"a-link-normal s-access-detail-page  s-color-twister-title-link a-text-normal\"");
 typedef std::tuple<std::string, int,std::regex> itemRegexType;
@@ -92,7 +93,7 @@ void getItemLinksFromCategory(std::list<std::string>& item_links, bool& isLinkCo
     isLinkCollectorDone = true;
 }
 
-void getItemPagesFromLinks(std::list<std::string>& item_links, bool& isPageCollectorDone, bool& isLinkCollectorDone, std::list<std::string>& item_pages, Semaphore& accessItemList, Semaphore& availableItemList, Semaphore& accessPageList, Semaphore& availablePageList){
+void getItemPagesFromLinks(std::list<std::string>& item_links,  int num_producers, bool& isPageCollectorDone, bool& isLinkCollectorDone, std::list<std::string>& item_pages, Semaphore& accessItemList, Semaphore& availableItemList, Semaphore& accessPageList, Semaphore& availablePageList){
     while(true){
         std::string url;
         availableItemList.acquire();
@@ -105,7 +106,7 @@ void getItemPagesFromLinks(std::list<std::string>& item_links, bool& isPageColle
             std::cout << "getItemPagesFromLinks - POPPED-URL" << std::endl;
             item_links.pop_front();
             if(isLinkCollectorDone && item_links.empty()){
-                for(auto i = 0; i < NUM_THREAD; i++){
+                for(auto i = 0; i < num_producers; i++){
                     accessItemList.release();
                     availableItemList.release();
                 }
@@ -125,7 +126,7 @@ void getItemPagesFromLinks(std::list<std::string>& item_links, bool& isPageColle
     isPageCollectorDone = true;
 }
 
-void getItemInfoFromItemPage(json& res, bool& isPageCollectorDone, std::list<std::string>& item_pages, Semaphore& accessPageList, Semaphore& availablePageList, std::list<itemRegexType>& info_page_regex){
+void getItemInfoFromItemPage(json& res, int num_consumers, bool& isPageCollectorDone, std::list<std::string>& item_pages, Semaphore& accessPageList, Semaphore& availablePageList, std::list<itemRegexType>& info_page_regex){
     while(true){
         std::string page;
         availablePageList.acquire();
@@ -137,7 +138,7 @@ void getItemInfoFromItemPage(json& res, bool& isPageCollectorDone, std::list<std
                 item_pages.pop_front();
                 std::cout << "getItemInfoFromItemPage - PAGE ANALYSIS" << std::endl;
                 if(isPageCollectorDone && item_pages.empty()){
-                    for(auto i = 0; i < 10; i++){
+                    for(auto i = 0; i < num_consumers; i++){
                         availablePageList.release();
                         accessPageList.release();
                     }
@@ -165,7 +166,9 @@ int main(int argc, char** argv) {
     Semaphore availablePageList(0);
     bool isLinkCollectorDone = false;
     bool isPageCollectorDone = false;
-
+    int num_producers = NUM_THREADS_PRODUCERS;
+    int num_consumers = NUM_THREADS_CONSUMERS;
+    
     std::list<std::string> item_links;
     std::list<std::string> item_pages;
     //get from std::cin
@@ -181,27 +184,44 @@ int main(int argc, char** argv) {
     std::string website = getValueFromString(url, website_regex);
     std::list<itemRegexType> info_page_regex = getItemInfoRegex(website);
     website = "https://" + website;
-    
 
+    if(std::getenv("NUM_THREADS_PRODUCERS")) num_producers = atoi(std::getenv("NUM_THREADS_PRODUCERS"));
+    if(std::getenv("NUM_THREADS_CONSUMERS")) num_consumers = atoi(std::getenv("NUM_THREADS_CONSUMERS"));
+
+    std::thread producer_threads[num_producers];
+    std::thread consumer_threads[num_consumers];
+
+    //CREATE THREADS
     std::thread itemLinkCollector(getItemLinksFromCategory, std::ref(item_links), std::ref(isLinkCollectorDone), std::ref(accessItemList), std::ref(availableItemList), std::ref(website), std::ref(url), std::ref(item_regex), std::ref(href_regex), std::ref(next_page_regex), std::ref(replace_step_regex));
 
-    std::thread itemPageCollector(getItemPagesFromLinks, std::ref(item_links), std::ref(isPageCollectorDone), std::ref(isLinkCollectorDone), std::ref(item_pages),  std::ref(accessItemList), std::ref(availableItemList),  std::ref(accessPageList), std::ref(availablePageList));
-    std::thread itemPageCollector1(getItemPagesFromLinks, std::ref(item_links), std::ref(isPageCollectorDone), std::ref(isLinkCollectorDone), std::ref(item_pages),  std::ref(accessItemList), std::ref(availableItemList),  std::ref(accessPageList), std::ref(availablePageList));
-    std::thread itemPageCollector2(getItemPagesFromLinks, std::ref(item_links), std::ref(isPageCollectorDone), std::ref(isLinkCollectorDone), std::ref(item_pages),  std::ref(accessItemList), std::ref(availableItemList),  std::ref(accessPageList), std::ref(availablePageList));
-    std::thread itemPageCollector3(getItemPagesFromLinks, std::ref(item_links), std::ref(isPageCollectorDone), std::ref(isLinkCollectorDone), std::ref(item_pages),  std::ref(accessItemList), std::ref(availableItemList),  std::ref(accessPageList), std::ref(availablePageList));
-    std::thread itemPageCollector4(getItemPagesFromLinks, std::ref(item_links), std::ref(isPageCollectorDone), std::ref(isLinkCollectorDone), std::ref(item_pages),  std::ref(accessItemList), std::ref(availableItemList),  std::ref(accessPageList), std::ref(availablePageList));
-    
-    std::thread itemInfoCollector(getItemInfoFromItemPage, std::ref(res), std::ref(isPageCollectorDone), std::ref(item_pages), std::ref(accessPageList), std::ref(availablePageList), std::ref(info_page_regex));
+    // for(auto i = 0; i < num_producers; i++){
+    //     std::thread itemPageCollector(getItemPagesFromLinks, std::ref(item_links), std::ref(num_producers), std::ref(isPageCollectorDone), std::ref(isLinkCollectorDone), std::ref(item_pages),  std::ref(accessItemList), std::ref(availableItemList),  std::ref(accessPageList), std::ref(availablePageList));
+    // }
+    // for(auto i = 0; i < num_consumers; i++){
+    //     std::thread itemInfoCollector(getItemInfoFromItemPage, std::ref(res), std::ref(num_consumers), std::ref(isPageCollectorDone), std::ref(item_pages), std::ref(accessPageList), std::ref(availablePageList), std::ref(info_page_regex));
+    // }
 
+    for(int i = 0; i < num_producers; i++){
+        producer_threads[i] = std::thread(getItemPagesFromLinks, std::ref(item_links), std::ref(num_producers), std::ref(isPageCollectorDone), std::ref(isLinkCollectorDone), std::ref(item_pages),  std::ref(accessItemList), std::ref(availableItemList),  std::ref(accessPageList), std::ref(availablePageList));
+    }
+    for(int i = 0; i < num_consumers; i++){
+        consumer_threads[i] = std::thread(getItemInfoFromItemPage, std::ref(res), std::ref(num_consumers), std::ref(isPageCollectorDone), std::ref(item_pages), std::ref(accessPageList), std::ref(availablePageList), std::ref(info_page_regex));
+    }
+
+    //JOIN THREADS
     itemLinkCollector.join();
 
-    itemPageCollector.join();
-    itemPageCollector1.join();
-    itemPageCollector2.join();
-    itemPageCollector3.join();
-    itemPageCollector4.join();
+    for (int i = 0; i < num_producers; ++i) {
+        producer_threads[i].join();
+    }      
+    for (int i = 0; i < num_consumers; ++i) {
+        consumer_threads[i].join();
+    }        
 
-    itemInfoCollector.join();
+
+    // itemPageCollector.join();
+
+    // itemInfoCollector.join();
 
     return 0;
 }
