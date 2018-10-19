@@ -10,17 +10,19 @@
 #include <chrono>
 #include "Semaphore.cpp"
 using json = nlohmann::json;
+
 #define NUM_THREADS_PRODUCERS 5
-#define NUM_THREADS_CONSUMERS 1
+#define NUM_THREADS_CONSUMERS 5
 #define SUBMARINO  "www.submarino.com.br"
 #define AMERICANAS "www.americanas.com.br"
+#define SHOPTIME   "www.shoptime.com.br"
 
 // ("<a class=\"a-link-normal s-access-detail-page  s-color-twister-title-link a-text-normal\"");
 typedef std::tuple<std::string, int,std::regex> itemRegexType;
 
 bool isURLSupported(std::string website){
     bool isSupported = false;
-    if(website == SUBMARINO || website == AMERICANAS)
+    if(website == SUBMARINO || website == AMERICANAS || website == SHOPTIME)
         isSupported = true;
     return isSupported;
 }
@@ -44,8 +46,8 @@ std::list<std::string> getItemLinks(std::string page, std::regex item_regex, std
     auto words_end = std::sregex_iterator();
     
     for (std::sregex_iterator i = words_begin; i != words_end; ++i) {
-        std::smatch match = *i;  
-        std::string link = "";     
+        std::smatch match  = *i;  
+        std::string link   = "";     
         std::string result = getValueFromString(match.str(), href_regex);
         link = prefix + result;
         item_links.push_back(link);
@@ -83,6 +85,12 @@ std::list<itemRegexType> getItemInfoRegex(std::string website){
         photo_url_regex          = std::regex("<img class=\"swiper-slide-img\" alt=\"(.+)\" src=\"([^\"]+)\"");
         price_regex              = std::regex("<p class=\"sales-price\">([^<]+)</p>");
         installments_price_regex = std::regex("<p class=\"payment-option payment-option-rate\">([^<]+)</p>");
+    }else if(website == SHOPTIME){
+        name_regex               = std::regex("<h1 class=\"product-name\">([^<]+)</h1>");
+        description_regex        = std::regex("<div><noframes>((.|\n)+)</noframes><iframe"); 
+        photo_url_regex          = std::regex("<img class=\"swiper-slide-img\" alt=\"(.+)\" src=\"([^\"]+)\"");
+        price_regex              = std::regex("<p class=\"sales-price\">([^<]+)</p>");
+        installments_price_regex = std::regex("<p class=\"payment-option payment-option-rate\">([^<]+)</p>");
     }
     std::list<itemRegexType> info_regex = {
         itemRegexType("name",1, name_regex),
@@ -110,6 +118,11 @@ std::vector<std::regex> getPagesRegex(std::string website){
         next_page_regex    = std::regex("<li class=\"\"><a href=\"([^<]+)\"><span aria-label=\"Next\">");
         replace_step_regex = std::regex("amp;");
         href_regex         = std::regex("(/produto/.+)(?=\")");
+    }else if(website == SHOPTIME){
+        item_regex         = std::regex("<a class=\"card-product-url\" href=\"([^\"]+[\"])");
+        next_page_regex    = std::regex("<li class=\"\"><a href=\"([^<]+)\"><span aria-label=\"Next\">");
+        replace_step_regex = std::regex("amp;");
+        href_regex         = std::regex("(/produto/.+)(?=\")");
     }
 
     std::vector<std::regex> page_regex = {
@@ -121,28 +134,35 @@ std::vector<std::regex> getPagesRegex(std::string website){
     return page_regex;
 }
 
-void getItemLinksFromCategory(std::list<std::string>& item_links, bool& isLinkCollectorDone, Semaphore& accessItemList, Semaphore& availableItemList, std::string& website, std::string& url, std::regex& item_regex, std::regex& href_regex, std::regex& next_page_regex, std::regex& replace_step_regex){
+void getItemLinksFromCategory(std::list<std::string>& item_links, bool& isLinkCollectorDone, double& totalDownloadDuration, Semaphore& accessDownloadTime, Semaphore& accessItemList, Semaphore& availableItemList, std::string& website, std::string& url, std::regex& item_regex, std::regex& href_regex, std::regex& next_page_regex, std::regex& replace_step_regex){
+    double localDownloadDuration;
     while(url != website){
+        std::chrono::high_resolution_clock::time_point downloadT1 = std::chrono::high_resolution_clock::now(); 
         std::string page = getPage(url);
+        std::chrono::high_resolution_clock::time_point downloadT2 = std::chrono::high_resolution_clock::now();   
+        localDownloadDuration += std::chrono::duration_cast<std::chrono::milliseconds>( downloadT2 - downloadT1 ).count();
+
         std::list<std::string> new_item_links = getItemLinks(page, item_regex, href_regex, item_links, website);
 
         accessItemList.acquire();
         for (auto i = new_item_links.begin(); i != new_item_links.end(); ++i){
             item_links.push_back(*i);
             availableItemList.release();
-            // std::cout << *i << std::endl;
         }
-        std::cout << "getItemLinksFromCategory - PUSHED LINKS" << std::endl;
+        std::cerr << "getItemLinksFromCategory - PUSHED LINKS" << std::endl;
         accessItemList.release();
 
-        // item_links.insert(item_links.end(), new_item_links.begin(), new_item_links.end());
         url = getNextPageLink(page, next_page_regex, replace_step_regex, website);
     }
-    std::cout << std::endl << "getItemLinksFromCategory - DONE" << std::endl ;
+    accessDownloadTime.acquire();
+        totalDownloadDuration += localDownloadDuration;
+    accessDownloadTime.release();
+    std::cerr << std::endl << "getItemLinksFromCategory - DONE" << std::endl ;
     isLinkCollectorDone = true;
 }
 
-void getItemPagesFromLinks(std::list<std::string>& item_links,  int num_producers, bool& isPageCollectorDone, bool& isLinkCollectorDone, std::list<std::string>& item_pages, Semaphore& accessItemList, Semaphore& availableItemList, Semaphore& accessPageList, Semaphore& availablePageList){
+void getItemPagesFromLinks(std::list<std::string>& item_links,  int num_producers, bool& isPageCollectorDone, bool& isLinkCollectorDone, double& totalDownloadDuration, Semaphore& accessDownloadTime, std::list<std::string>& item_pages, Semaphore& accessItemList, Semaphore& availableItemList, Semaphore& accessPageList, Semaphore& availablePageList){
+    double localDownloadDuration;
     while(true){
         std::string url;
         availableItemList.acquire();
@@ -152,7 +172,7 @@ void getItemPagesFromLinks(std::list<std::string>& item_links,  int num_producer
         }else{
             
             url = item_links.front();
-            std::cout << "getItemPagesFromLinks - POPPED-URL" << std::endl;
+            std::cerr << "getItemPagesFromLinks - POPPED-URL" << std::endl;
             item_links.pop_front();
             if(isLinkCollectorDone && item_links.empty()){
                 for(auto i = 0; i < num_producers; i++){
@@ -162,20 +182,24 @@ void getItemPagesFromLinks(std::list<std::string>& item_links,  int num_producer
             }
         }
         accessItemList.release();
-        
-        std::string page = getPage(url);
-
+            std::chrono::high_resolution_clock::time_point downloadT1 = std::chrono::high_resolution_clock::now(); 
+            std::string page = getPage(url);
+            std::chrono::high_resolution_clock::time_point downloadT2 = std::chrono::high_resolution_clock::now();   
+            localDownloadDuration += std::chrono::duration_cast<std::chrono::milliseconds>( downloadT2 - downloadT1 ).count();
         accessPageList.acquire();
             item_pages.push_back(page);
             availablePageList.release();
-            std::cout << "getItemPagesFromLinks - ADDED PAGE" << std::endl;   
+            std::cerr << "getItemPagesFromLinks - ADDED PAGE" << std::endl;   
         accessPageList.release();
     }
-    std::cout << std::endl << "getItemPagesFromLinks - DONE" << std::endl;
+    accessDownloadTime.acquire();
+        totalDownloadDuration += localDownloadDuration;
+    accessDownloadTime.release();
+    std::cerr << std::endl << "getItemPagesFromLinks - DONE" << std::endl;
     isPageCollectorDone = true;
 }
 
-void getItemInfoFromItemPage(json& res, int num_consumers, bool& isPageCollectorDone, std::list<std::string>& item_pages, Semaphore& accessPageList, Semaphore& availablePageList, std::list<itemRegexType>& info_page_regex){
+void getItemInfoFromItemPage(json& res, Semaphore& accessJSON, int num_consumers, bool& isPageCollectorDone, std::list<std::string>& item_pages, Semaphore& accessPageList, Semaphore& availablePageList, std::list<itemRegexType>& info_page_regex){
     while(true){
         std::string page;
         availablePageList.acquire();
@@ -185,8 +209,9 @@ void getItemInfoFromItemPage(json& res, int num_consumers, bool& isPageCollector
             }else{
                 page = item_pages.front();
                 item_pages.pop_front();
-                std::cout << "getItemInfoFromItemPage - PAGE ANALYSIS" << std::endl;
+                std::cerr << "getItemInfoFromItemPage - PAGE ANALYSIS" << std::endl;
                 if(isPageCollectorDone && item_pages.empty()){
+                    // std::cerr << std::endl << res.dump() << std::endl;
                     for(auto i = 0; i < num_consumers; i++){
                         availablePageList.release();
                         accessPageList.release();
@@ -196,45 +221,62 @@ void getItemInfoFromItemPage(json& res, int num_consumers, bool& isPageCollector
         accessPageList.release();
 
         json info;
-        // info["url"] = url;
         for (auto i = info_page_regex.begin(); i != info_page_regex.end(); ++i){
             std::string key = std::get<0>(*i);
             std::string value = getValueFromString(page, std::get<2>(*i), std::get<1>(*i));
             info[key] = value;
         }
-        std::cout << "getItemInfoFromItemPage - JSON PUSHED" << std::endl;
-        res.push_back(info);
+        std::cerr << "getItemInfoFromItemPage - JSON PUSHED" << std::endl;
+        accessJSON.acquire();
+            res.push_back(info);
+        accessJSON.release();
     }
-    std::cout << std::endl << res.dump() << std::endl;
 }
 
 int main(int argc, char** argv) {
+    //Semaphores and Thread controls
     Semaphore accessItemList(1);
     Semaphore availableItemList(0);
     Semaphore accessPageList(1);
     Semaphore availablePageList(0);
+    Semaphore accessDownloadTime(1);
+    Semaphore accessJSON(1);
     bool isLinkCollectorDone = false;
     bool isPageCollectorDone = false;
-    int num_producers = NUM_THREADS_PRODUCERS;
-    int num_consumers = NUM_THREADS_CONSUMERS;
-    
+    //Thread numbers
+    int num_producers, num_consumers;
+    num_producers = NUM_THREADS_PRODUCERS;
+    num_consumers = NUM_THREADS_CONSUMERS;
+    if (argc >= 3){
+        num_producers = std::stoi( argv[2]);
+        if(argc > 3){
+            num_consumers = std::stoi( argv[3]);
+        }
+    }else{
+        num_producers = NUM_THREADS_PRODUCERS;
+        num_consumers = NUM_THREADS_CONSUMERS;
+    }
+    //Time measures
+    double totalDownloadDuration = 0;
+    //Shared Lists
     std::list<std::string> item_links;
     std::list<std::string> item_pages;
-    //get from std::cin
-    std::string url = argv[1];
+    //Final JSON
     json res;
-    //get from choosen website regex file
-
+    //input URL
+    std::string url = argv[1];
     std::regex website_regex("https://(([^/]+))/");
     std::string website = getValueFromString(url, website_regex);
-    if(isURLSupported(website)){
-        std::cout << website << " - \033[1;32m URL supported\033[0m" << std::endl;
 
-        std::vector<std::regex> page_regex = getPagesRegex(website);
-        std::regex item_regex = page_regex[0];
-        std::regex next_page_regex = page_regex[1];
-        std::regex replace_step_regex = page_regex[2];
-        std::regex href_regex = page_regex[3];
+
+    if(isURLSupported(website)){
+        std::cerr <<  std::endl << website << " -\033[1;32m URL supported\033[0m" <<  std::endl << std::endl;
+
+        std::vector<std::regex> page_regex       = getPagesRegex(website);
+        std::regex item_regex                    = page_regex[0];
+        std::regex next_page_regex               = page_regex[1];
+        std::regex replace_step_regex            = page_regex[2];
+        std::regex href_regex                    = page_regex[3];
         std::list<itemRegexType> info_page_regex = getItemInfoRegex(website);
         website = "https://" + website;
 
@@ -245,27 +287,30 @@ int main(int argc, char** argv) {
         std::thread consumer_threads[num_consumers];
 
         //CREATE THREADS
-        std::thread itemLinkCollector(getItemLinksFromCategory, std::ref(item_links), std::ref(isLinkCollectorDone), std::ref(accessItemList), std::ref(availableItemList), std::ref(website), std::ref(url), std::ref(item_regex), std::ref(href_regex), std::ref(next_page_regex), std::ref(replace_step_regex));
-
-        for(int i = 0; i < num_producers; i++){
-            producer_threads[i] = std::thread(getItemPagesFromLinks, std::ref(item_links), std::ref(num_producers), std::ref(isPageCollectorDone), std::ref(isLinkCollectorDone), std::ref(item_pages),  std::ref(accessItemList), std::ref(availableItemList),  std::ref(accessPageList), std::ref(availablePageList));
-        }
-        for(int i = 0; i < num_consumers; i++){
-            consumer_threads[i] = std::thread(getItemInfoFromItemPage, std::ref(res), std::ref(num_consumers), std::ref(isPageCollectorDone), std::ref(item_pages), std::ref(accessPageList), std::ref(availablePageList), std::ref(info_page_regex));
-        }
+        std::thread itemLinkCollector(getItemLinksFromCategory, std::ref(item_links), std::ref(isLinkCollectorDone), std::ref(totalDownloadDuration), std::ref(accessDownloadTime), std::ref(accessItemList), std::ref(availableItemList), std::ref(website), std::ref(url), std::ref(item_regex), std::ref(href_regex), std::ref(next_page_regex), std::ref(replace_step_regex));
+        for(int i = 0; i < num_producers; i++)
+            producer_threads[i] = std::thread(getItemPagesFromLinks, std::ref(item_links), std::ref(num_producers), std::ref(isPageCollectorDone), std::ref(isLinkCollectorDone), std::ref(totalDownloadDuration), std::ref(accessDownloadTime), std::ref(item_pages),  std::ref(accessItemList), std::ref(availableItemList),  std::ref(accessPageList), std::ref(availablePageList));
+        for(int i = 0; i < num_consumers; i++)
+            consumer_threads[i] = std::thread(getItemInfoFromItemPage, std::ref(res), std::ref(accessJSON), std::ref(num_consumers), std::ref(isPageCollectorDone), std::ref(item_pages), std::ref(accessPageList), std::ref(availablePageList), std::ref(info_page_regex));
 
         //JOIN THREADS
         itemLinkCollector.join();
-
-        for (int i = 0; i < num_producers; ++i) {
+        for (int i = 0; i < num_producers; ++i) 
             producer_threads[i].join();
-        }      
-        for (int i = 0; i < num_consumers; ++i) {
+        for (int i = 0; i < num_consumers; ++i)
             consumer_threads[i].join();
-        }        
+        std::cout << res << std::endl;
+        std::cerr << totalDownloadDuration << std::endl;
     }else{
-        std::cout << "URL not supported" << std::endl;
+        std::cerr << std::endl  << website << " -\033[1;31m URL not supported\033[0m" << std::endl  << std::endl;
+        std::cerr << "Please use one of the supported URLS:" << std::endl;
+        std::cerr << AMERICANAS << std::endl;
+        std::cerr << SUBMARINO  << std::endl;
+        std::cerr << SHOPTIME   << std::endl;
+        std::cerr << std::endl;
+        return -1;
     }
+    
 
     return 0;
 }

@@ -23,6 +23,7 @@
         "array": "cpp",
         "utility": "cpp",
         "__functional_base": "cpp",
-        "thread": "cpp"
+        "thread": "cpp",
+        "chrono": "cpp"
     }
 }

@@ -32,6 +32,11 @@ endif()
 
 add_subdirectory(opt)
 
+#create exe parallel
 add_executable(crawler crawler.cpp)
 target_link_libraries(crawler ${CPR_LIBRARIES})
+include_directories(${CPR_INCLUDE_DIRS} ${JSON_INCLUDE_DIRS})
+#create exe sequencial
+add_executable(crawler_sequential crawler_sequential.cpp)
+target_link_libraries(crawler_sequential ${CPR_LIBRARIES})
 include_directories(${CPR_INCLUDE_DIRS} ${JSON_INCLUDE_DIRS})
