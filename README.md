@@ -1,11 +1,11 @@
 # C++ Crawler
 Project for SuperComputing class @ Insper
-##Project
+## Project
 This project implements a C++ Crawler for most of B2W websites (One of the biggest Brazilian Online Marketplace).
 
 The concept is that, given a *category url* from one of the websites, the program returns a *JSON* with the content from the products contained in that category.
 
-##Parameters
+## Parameters
 Product Name
 Product Description
 Product Price
@@ -13,7 +13,7 @@ Product Price Installments
 Product Image URL
 Product Category
 
-###Valid URLs:
+### Valid URLs:
 The accepted URLs are Category only URLs. From these websites:
 
 - https://www.submarino.com.br[https://www.submarino.com.br]
@@ -24,14 +24,14 @@ Should Specify in this model
 ```
 https://www.<website>.com.br/categoria/<specific_category>
 ```
-####examples
+#### examples
 ```
 https://www.submarino.com.br/categoria/brinquedos/hoverboard/f/preco-2579.0:3224.0?ordenacao=topSelling&origem=omega
 
 https://www.americanas.com.br/categoria/brinquedos/bonecos/f/marca-bandai/genero-n%C3%A3o%20se%20aplica/genero-unisex?ordenacao=topSelling&origem=omega
 ```
 
-##Building
+## Building
 
 This project and C++ Requests both use CMake. The first step is to make sure all of the submodules are initialized:
 ```
@@ -45,7 +45,7 @@ cmake ..
 make
 ```
 
-##Running the crawler
+## Running the crawler
 Inside the build folder execute either the parallel version by running following commands:
 ```
 ./crawler <website_url> <num_producer_threads> <num_consumer_threads>
@@ -58,17 +58,17 @@ or the sequential version by running:
 *num_producer_threads* - Is an integer describing the number of threads dedicated to the Producers Threads
 *num_consumer_threads* - Is an integer describing the number of threads dedicated to the Consumer Threads
 
-#Program Analysis
+# Program Analysis
 While this project has the purpose of collecting data from an online marketplace. The goal is to compare the performance and memory consumption from the *Sequential* and the *Parallel* implementations.
 
-##Performance Analysis
+## Performance Analysis
 To do so, run the python3 code:
 ```
 python3 analysis.py
 ```
 This program will run the crawler for a small number of pages, comparing the time consumption from the two models and the increment of threads on the parallel model.
 
-##Memory Consumption
+## Memory Consumption
 To analyze memory consumption, I decided to use python's memory-profiler:
 To install the module run:
 ```
@@ -89,7 +89,7 @@ mprof plot
 mprof clean
 ```
 
-##Next-Steps
+## Next-Steps
 
 - Implement a better model for accepting new websites;
 - Restructure code;
