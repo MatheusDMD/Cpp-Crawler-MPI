@@ -24,6 +24,8 @@
         "utility": "cpp",
         "__functional_base": "cpp",
         "thread": "cpp",
-        "chrono": "cpp"
-    }
+        "chrono": "cpp",
+        "list": "cpp"
+    },
+    "python.pythonPath": "/usr/local/bin/python3"
 }

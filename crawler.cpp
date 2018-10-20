@@ -134,35 +134,41 @@ std::vector<std::regex> getPagesRegex(std::string website){
     return page_regex;
 }
 
-void getItemLinksFromCategory(std::list<std::string>& item_links, bool& isLinkCollectorDone, double& totalDownloadDuration, Semaphore& accessDownloadTime, Semaphore& accessItemList, Semaphore& availableItemList, std::string& website, std::string& url, std::regex& item_regex, std::regex& href_regex, std::regex& next_page_regex, std::regex& replace_step_regex){
-    double localDownloadDuration;
+void getItemLinksFromCategory(std::list<std::string>& item_links, bool& isLinkCollectorDone, double& totalDownloadDuration, Semaphore& accessDownloadTime, Semaphore&  accessProcessTime, double& totalProcessDuration, Semaphore& accessItemList, Semaphore& availableItemList, std::string& website, std::string& url, std::regex& item_regex, std::regex& href_regex, std::regex& next_page_regex, std::regex& replace_step_regex,int& totalCount){
+    double localDownloadDuration = 0, localProcessDuration = 0;
     while(url != website){
         std::chrono::high_resolution_clock::time_point downloadT1 = std::chrono::high_resolution_clock::now(); 
         std::string page = getPage(url);
         std::chrono::high_resolution_clock::time_point downloadT2 = std::chrono::high_resolution_clock::now();   
         localDownloadDuration += std::chrono::duration_cast<std::chrono::milliseconds>( downloadT2 - downloadT1 ).count();
-
+        std::chrono::high_resolution_clock::time_point processT1 = std::chrono::high_resolution_clock::now(); 
         std::list<std::string> new_item_links = getItemLinks(page, item_regex, href_regex, item_links, website);
 
         accessItemList.acquire();
         for (auto i = new_item_links.begin(); i != new_item_links.end(); ++i){
             item_links.push_back(*i);
             availableItemList.release();
+            totalCount += 1;
         }
         std::cerr << "getItemLinksFromCategory - PUSHED LINKS" << std::endl;
         accessItemList.release();
 
         url = getNextPageLink(page, next_page_regex, replace_step_regex, website);
+        std::chrono::high_resolution_clock::time_point processT2 = std::chrono::high_resolution_clock::now(); 
+        localProcessDuration += std::chrono::duration_cast<std::chrono::milliseconds>( processT2 - processT1 ).count();
     }
     accessDownloadTime.acquire();
         totalDownloadDuration += localDownloadDuration;
     accessDownloadTime.release();
+    accessProcessTime.acquire();
+        totalProcessDuration += localProcessDuration;
+    accessProcessTime.release();
     std::cerr << std::endl << "getItemLinksFromCategory - DONE" << std::endl ;
     isLinkCollectorDone = true;
 }
 
 void getItemPagesFromLinks(std::list<std::string>& item_links,  int num_producers, bool& isPageCollectorDone, bool& isLinkCollectorDone, double& totalDownloadDuration, Semaphore& accessDownloadTime, std::list<std::string>& item_pages, Semaphore& accessItemList, Semaphore& availableItemList, Semaphore& accessPageList, Semaphore& availablePageList){
-    double localDownloadDuration;
+    double localDownloadDuration = 0;
     while(true){
         std::string url;
         availableItemList.acquire();
@@ -199,7 +205,8 @@ void getItemPagesFromLinks(std::list<std::string>& item_links,  int num_producer
     isPageCollectorDone = true;
 }
 
-void getItemInfoFromItemPage(json& res, Semaphore& accessJSON, int num_consumers, bool& isPageCollectorDone, std::list<std::string>& item_pages, Semaphore& accessPageList, Semaphore& availablePageList, std::list<itemRegexType>& info_page_regex){
+void getItemInfoFromItemPage(json& res, Semaphore& accessJSON, int num_consumers, bool& isPageCollectorDone, std::list<std::string>& item_pages, Semaphore& accessPageList, Semaphore& availablePageList, std::list<itemRegexType>& info_page_regex, Semaphore&  accessProcessTime, double& totalProcessDuration){
+    double localProcessDuration = 0;
     while(true){
         std::string page;
         availablePageList.acquire();
@@ -220,17 +227,23 @@ void getItemInfoFromItemPage(json& res, Semaphore& accessJSON, int num_consumers
             }
         accessPageList.release();
 
+        std::chrono::high_resolution_clock::time_point processT1 = std::chrono::high_resolution_clock::now(); 
         json info;
         for (auto i = info_page_regex.begin(); i != info_page_regex.end(); ++i){
             std::string key = std::get<0>(*i);
             std::string value = getValueFromString(page, std::get<2>(*i), std::get<1>(*i));
             info[key] = value;
         }
+        std::chrono::high_resolution_clock::time_point processT2 = std::chrono::high_resolution_clock::now(); 
+        localProcessDuration += std::chrono::duration_cast<std::chrono::milliseconds>( processT2 - processT1 ).count();
         std::cerr << "getItemInfoFromItemPage - JSON PUSHED" << std::endl;
         accessJSON.acquire();
             res.push_back(info);
         accessJSON.release();
     }
+    accessProcessTime.acquire();
+        totalProcessDuration += localProcessDuration;
+    accessProcessTime.release();
 }
 
 int main(int argc, char** argv) {
@@ -240,6 +253,8 @@ int main(int argc, char** argv) {
     Semaphore accessPageList(1);
     Semaphore availablePageList(0);
     Semaphore accessDownloadTime(1);
+    Semaphore accessProcessTime(1);
+    Semaphore accessTotalTime(1);
     Semaphore accessJSON(1);
     bool isLinkCollectorDone = false;
     bool isPageCollectorDone = false;
@@ -248,9 +263,17 @@ int main(int argc, char** argv) {
     num_producers = NUM_THREADS_PRODUCERS;
     num_consumers = NUM_THREADS_CONSUMERS;
     if (argc >= 3){
-        num_producers = std::stoi( argv[2]);
+        if(std::stoi( argv[2]) >= 1){
+            num_producers = std::stoi( argv[2]);
+        }else{
+            std::cerr << std::endl  << argv[2] << " -\033[1;31 number of producer threads is less than 1 \033[0m" << std::endl  << std::endl;
+        }
         if(argc > 3){
-            num_consumers = std::stoi( argv[3]);
+            if(std::stoi( argv[3]) >= 1){
+                num_consumers = std::stoi( argv[3]);
+            }else{
+                std::cerr << std::endl  << argv[3] << " -\033[1;31m number of consumer threads  is less than 1 \033[0m" << std::endl  << std::endl;
+            }
         }
     }else{
         num_producers = NUM_THREADS_PRODUCERS;
@@ -258,6 +281,10 @@ int main(int argc, char** argv) {
     }
     //Time measures
     double totalDownloadDuration = 0;
+    double totalProcessDuration = 0;
+    double totalDuration = 0;
+    //Count
+    int totalCount = 0;
     //Shared Lists
     std::list<std::string> item_links;
     std::list<std::string> item_pages;
@@ -268,8 +295,10 @@ int main(int argc, char** argv) {
     std::regex website_regex("https://(([^/]+))/");
     std::string website = getValueFromString(url, website_regex);
 
-
     if(isURLSupported(website)){
+        //Program Time Measure
+        std::chrono::high_resolution_clock::time_point programT1 = std::chrono::high_resolution_clock::now(); 
+
         std::cerr <<  std::endl << website << " -\033[1;32m URL supported\033[0m" <<  std::endl << std::endl;
 
         std::vector<std::regex> page_regex       = getPagesRegex(website);
@@ -287,11 +316,11 @@ int main(int argc, char** argv) {
         std::thread consumer_threads[num_consumers];
 
         //CREATE THREADS
-        std::thread itemLinkCollector(getItemLinksFromCategory, std::ref(item_links), std::ref(isLinkCollectorDone), std::ref(totalDownloadDuration), std::ref(accessDownloadTime), std::ref(accessItemList), std::ref(availableItemList), std::ref(website), std::ref(url), std::ref(item_regex), std::ref(href_regex), std::ref(next_page_regex), std::ref(replace_step_regex));
+        std::thread itemLinkCollector(getItemLinksFromCategory, std::ref(item_links), std::ref(isLinkCollectorDone), std::ref(totalDownloadDuration), std::ref(accessDownloadTime), std::ref(accessProcessTime), std::ref(totalProcessDuration), std::ref(accessItemList), std::ref(availableItemList), std::ref(website), std::ref(url), std::ref(item_regex), std::ref(href_regex), std::ref(next_page_regex), std::ref(replace_step_regex), std::ref(totalCount));
         for(int i = 0; i < num_producers; i++)
             producer_threads[i] = std::thread(getItemPagesFromLinks, std::ref(item_links), std::ref(num_producers), std::ref(isPageCollectorDone), std::ref(isLinkCollectorDone), std::ref(totalDownloadDuration), std::ref(accessDownloadTime), std::ref(item_pages),  std::ref(accessItemList), std::ref(availableItemList),  std::ref(accessPageList), std::ref(availablePageList));
         for(int i = 0; i < num_consumers; i++)
-            consumer_threads[i] = std::thread(getItemInfoFromItemPage, std::ref(res), std::ref(accessJSON), std::ref(num_consumers), std::ref(isPageCollectorDone), std::ref(item_pages), std::ref(accessPageList), std::ref(availablePageList), std::ref(info_page_regex));
+            consumer_threads[i] = std::thread(getItemInfoFromItemPage, std::ref(res), std::ref(accessJSON), std::ref(num_consumers), std::ref(isPageCollectorDone), std::ref(item_pages), std::ref(accessPageList), std::ref(availablePageList), std::ref(info_page_regex), std::ref(accessProcessTime),std::ref(totalProcessDuration));
 
         //JOIN THREADS
         itemLinkCollector.join();
@@ -299,8 +328,19 @@ int main(int argc, char** argv) {
             producer_threads[i].join();
         for (int i = 0; i < num_consumers; ++i)
             consumer_threads[i].join();
+        
+        //output JSON
         std::cout << res << std::endl;
+        std::cout << "JSON" << std::endl;
+
+        //Program Time Measure
+        std::chrono::high_resolution_clock::time_point programT2 = std::chrono::high_resolution_clock::now(); 
+        totalDuration += std::chrono::duration_cast<std::chrono::milliseconds>( programT2 - programT1 ).count();
+
         std::cerr << totalDownloadDuration << std::endl;
+        std::cerr << totalProcessDuration << std::endl;
+        std::cerr << totalDuration << std::endl;
+        std::cerr << totalCount << std::endl;
     }else{
         std::cerr << std::endl  << website << " -\033[1;31m URL not supported\033[0m" << std::endl  << std::endl;
         std::cerr << "Please use one of the supported URLS:" << std::endl;
