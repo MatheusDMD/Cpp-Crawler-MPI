@@ -138,8 +138,19 @@ int main(int argc, char** argv) {
                 item_links = getItemLinks(page, item_regex, href_regex, item_links, website);
                 std::cerr << "after links" << std::endl;
                 int size = item_links.size()/world.size();
-                for(int i = 0, j = 1; i < item_links.size() - size; i = i + size, j++){
-                    std::vector<std::string> process_item_links(item_links.begin()+ i, item_links.begin() + i + size);
+                int uneven_division = 0;
+                if((item_links.size() % 2 == 0 && world.size() % 2 != 0) || (item_links.size() % 2 != 0 && world.size() % 2 == 0)){
+                    uneven_division = 1;
+                    std::cerr << "uneven_division" << std::endl;
+                }
+                for(int i = 0, j = 1; i < item_links.size() - size - uneven_division; i = i + size, j++){
+                    std::vector<std::string> process_item_links;
+                    if(i >= item_links.size() - size - uneven_division){
+                        std::cerr << "last" << std::endl;
+                        process_item_links = std::vector<std::string>(item_links.begin()+ i, item_links.begin() + i + size + 1);
+                    }else{
+                        process_item_links = std::vector<std::string>(item_links.begin()+ i, item_links.begin() + i + size);
+                    }
                     std::cerr << j << std::endl;
                     totalCount += 1;
                     world.send(j, LINK_VECTOR, process_item_links);
