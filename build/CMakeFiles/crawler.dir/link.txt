@@ -1,0 +1,1 @@
+/Library/Developer/CommandLineTools/usr/bin/c++   -std=c++11 -stdlib=libc++ -Wl,-search_paths_first -Wl,-headerpad_max_install_names  CMakeFiles/crawler.dir/crawlerMPI.cpp.o  -o crawler lib/libcpr.a /usr/local/Cellar/open-mpi/3.1.2/lib/libmpi.dylib /usr/local/lib/libboost_mpi-mt.dylib /usr/local/lib/libboost_serialization-mt.dylib /usr/lib/libcurl.dylib 
