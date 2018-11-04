@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 2.8.7)
 # project(cpr-example)
 find_package(MPI REQUIRED)
 find_package(Boost 1.4 COMPONENTS mpi serialization REQUIRED)
+include_directories(${MPI_INCLUDE_PATH})
 
 if(NOT ${CMAKE_VERSION} LESS 3.2)
     set(CMAKE_CXX_STANDARD 11)
