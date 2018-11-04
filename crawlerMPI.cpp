@@ -139,15 +139,15 @@ int main(int argc, char** argv) {
                 std::cerr << "after links" << std::endl;
                 int size = item_links.size()/world.size();
                 int uneven_division = 0;
-                if((item_links.size() % 2 == 0 && world.size() % 2 != 0) || (item_links.size() % 2 != 0 && world.size() % 2 == 0)){
-                    uneven_division = 1;
+                if(item_links.size()%world.size() != 0){
+                    uneven_division = item_links.size()%world.size();
                     std::cerr << "uneven_division" << std::endl;
                 }
                 for(int i = 0, j = 1; i < item_links.size() - size - uneven_division; i = i + size, j++){
                     std::vector<std::string> process_item_links;
                     if(i >= item_links.size() - size - uneven_division){
                         std::cerr << "last" << std::endl;
-                        process_item_links = std::vector<std::string>(item_links.begin()+ i, item_links.begin() + i + size + 1);
+                        process_item_links = std::vector<std::string>(item_links.begin()+ i, item_links.begin() + i + size + uneven_division);
                     }else{
                         process_item_links = std::vector<std::string>(item_links.begin()+ i, item_links.begin() + i + size);
                     }
