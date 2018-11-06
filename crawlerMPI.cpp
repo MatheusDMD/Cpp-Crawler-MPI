@@ -2,7 +2,7 @@
 #include <iterator>
 #include <string>
 #include <cpr/cpr.h>
-#include <json.hpp>
+// #include <json.hpp>
 #include <regex>
 #include <vector>
 #include <tuple>
@@ -20,7 +20,7 @@
 #define END_PROCESS 4
 
 namespace mpi = boost::mpi;
-using json = nlohmann::json;
+// using json = nlohmann::json;
 
 typedef std::tuple<std::string, int,std::regex> itemRegexType;
 
@@ -64,18 +64,6 @@ std::string getNextPageLink(std::string page, std::regex next_page_regex, std::r
     return link;
 }
 
-
-std::string getItemInfo(std::string page, std::string url, std::vector<itemRegexType> info_page_regex){
-    std::string info = "{";
-    info += "\"url\": \"" + url + "\",";
-    for (auto i = info_page_regex.begin(); i != info_page_regex.end(); ++i){
-        std::string key = std::get<0>(*i);
-        std::string value = getValueFromString(page, std::get<2>(*i), std::get<1>(*i));
-        info += "\""+ key +"\":\"" + value + "\",";
-    }
-    info += "};";
-    return info;
-}
 
 std::vector<itemRegexType> getItemInfoRegex(){
     //get values from file!
@@ -167,6 +155,7 @@ int main(int argc, char** argv) {
         }
 
         std::string final_json;
+        final_json += "{";
         for(int process_n = 1; process_n < world.size(); process_n++){
             std::string process_json;
             double localDownloadDuration = 0;
@@ -181,9 +170,10 @@ int main(int argc, char** argv) {
 
             final_json += "{";
             final_json += process_json;
-            final_json += "}";
-            std::cerr << "JSON RECEBIDO - " << process_n << std::endl;
+            final_json += "},";
+            std::cerr << "JSON RECEBIDO - " << process_json << std::endl;
         }
+        final_json += "}";
         std::chrono::high_resolution_clock::time_point totalT2 = std::chrono::high_resolution_clock::now(); 
         totalDuration += std::chrono::duration_cast<std::chrono::milliseconds>( totalT2 - totalT1 ).count();
        
@@ -207,7 +197,6 @@ int main(int argc, char** argv) {
                 break;
             }else{
                 for (auto i = item_links.begin(); i != item_links.end(); ++i){
-                    json info;
                     std::chrono::high_resolution_clock::time_point download2T1 = std::chrono::high_resolution_clock::now(); 
                         std::string page = getPage(*i);
                     std::chrono::high_resolution_clock::time_point download2T2 = std::chrono::high_resolution_clock::now(); 
@@ -215,14 +204,24 @@ int main(int argc, char** argv) {
 
                     std::chrono::high_resolution_clock::time_point process2T1 = std::chrono::high_resolution_clock::now(); 
                         std::cerr << "BEFORE: " << world.rank() << std::endl;
-                        res += getItemInfo(page, *i, info_page_regex);
+                        std::string info = "{";
+                        info += "\"url\": \"" + *i + "\",";
+                        for (auto i = info_page_regex.begin(); i != info_page_regex.end(); ++i){
+                            std::string key = std::get<0>(*i);
+                            std::string value = getValueFromString(page, std::get<2>(*i), std::get<1>(*i));
+                            info += "\""+ key +"\":\"" + value + "\",";
+                        }
+                        info += "};";
+                        res += info;
                         std::cerr << "AFTER: " << world.rank() << std::endl;
                     std::chrono::high_resolution_clock::time_point process2T2 = std::chrono::high_resolution_clock::now(); 
                     localProcessDuration += std::chrono::duration_cast<std::chrono::milliseconds>( process2T2 - process2T1 ).count();
                     std::cerr << "Page processed - RANK:" << world.rank() << std::endl;
                 }
             }
+            std::cerr << "JSON RES - " << res << std::endl;
         }
+        
         world.send(0,JSON_RESULT,res);
         std::cerr << "DONE Page process - RANK:" << world.rank() << std::endl;
         world.send(0,TIME_DOWNLOAD,localDownloadDuration);
