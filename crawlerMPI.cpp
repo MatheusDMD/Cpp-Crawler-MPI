@@ -65,14 +65,15 @@ std::string getNextPageLink(std::string page, std::regex next_page_regex, std::r
 }
 
 
-json getItemInfo(std::string page, std::string url, std::vector<itemRegexType> info_page_regex){
-    json info;
-    info["url"] = url;
+std::string getItemInfo(std::string page, std::string url, std::vector<itemRegexType> info_page_regex){
+    std::string info = "{";
+    info += "\"url\": \"" + url + "\",";
     for (auto i = info_page_regex.begin(); i != info_page_regex.end(); ++i){
         std::string key = std::get<0>(*i);
         std::string value = getValueFromString(page, std::get<2>(*i), std::get<1>(*i));
-        info[key] = value;
+        info += "\""+ key +"\":\"" + value + "\",";
     }
+    info += "};";
     return info;
 }
 
@@ -177,7 +178,10 @@ int main(int argc, char** argv) {
 
             totalDownloadDuration += localDownloadDuration;
             totalProcessDuration += localProcessDuration;
+
+            final_json += "{";
             final_json += process_json;
+            final_json += "}";
             std::cerr << "JSON RECEBIDO - " << process_n << std::endl;
         }
         std::chrono::high_resolution_clock::time_point totalT2 = std::chrono::high_resolution_clock::now(); 
@@ -193,7 +197,7 @@ int main(int argc, char** argv) {
         std::vector<itemRegexType> info_page_regex = getItemInfoRegex();
         double localDownloadDuration = 0;
         double localProcessDuration = 0;
-        json res;
+        std::string res;
         while(true){            
             std::vector<std::string> item_links;
             world.recv(0,LINK_VECTOR,item_links);
@@ -211,7 +215,7 @@ int main(int argc, char** argv) {
 
                     std::chrono::high_resolution_clock::time_point process2T1 = std::chrono::high_resolution_clock::now(); 
                         std::cerr << "BEFORE: " << world.rank() << std::endl;
-                        res.push_back(getItemInfo(page, *i, info_page_regex));
+                        res += getItemInfo(page, *i, info_page_regex);
                         std::cerr << "AFTER: " << world.rank() << std::endl;
                     std::chrono::high_resolution_clock::time_point process2T2 = std::chrono::high_resolution_clock::now(); 
                     localProcessDuration += std::chrono::duration_cast<std::chrono::milliseconds>( process2T2 - process2T1 ).count();
@@ -219,7 +223,7 @@ int main(int argc, char** argv) {
                 }
             }
         }
-        world.send(0,JSON_RESULT,res.dump());
+        world.send(0,JSON_RESULT,res);
         std::cerr << "DONE Page process - RANK:" << world.rank() << std::endl;
         world.send(0,TIME_DOWNLOAD,localDownloadDuration);
         world.send(0,TIME_PROCESS,localProcessDuration);
