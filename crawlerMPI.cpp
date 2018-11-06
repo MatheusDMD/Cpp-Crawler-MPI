@@ -197,6 +197,7 @@ int main(int argc, char** argv) {
         while(true){            
             std::vector<std::string> item_links;
             world.recv(0,LINK_VECTOR,item_links);
+            std::cerr << "JSON RECIEVED - " << world.rank() << std::endl;
             if(item_links.empty()){
                 std::cerr << "END - " << world.rank() << std::endl;
                 break;
@@ -209,7 +210,9 @@ int main(int argc, char** argv) {
                     localDownloadDuration += std::chrono::duration_cast<std::chrono::milliseconds>( download2T2 - download2T1 ).count();
 
                     std::chrono::high_resolution_clock::time_point process2T1 = std::chrono::high_resolution_clock::now(); 
+                        std::cerr << "BEFORE: " << world.rank() << std::endl;
                         res.push_back(getItemInfo(page, *i, info_page_regex));
+                        std::cerr << "AFTER: " << world.rank() << std::endl;
                     std::chrono::high_resolution_clock::time_point process2T2 = std::chrono::high_resolution_clock::now(); 
                     localProcessDuration += std::chrono::duration_cast<std::chrono::milliseconds>( process2T2 - process2T1 ).count();
                     std::cerr << "Page processed - RANK:" << world.rank() << std::endl;
