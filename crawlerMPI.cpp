@@ -187,7 +187,7 @@ int main(int argc, char** argv) {
         std::vector<itemRegexType> info_page_regex = getItemInfoRegex();
         double localDownloadDuration = 0;
         double localProcessDuration = 0;
-        std::string res;
+        std::string res = "";
         while(true){            
             std::vector<std::string> item_links;
             world.recv(0,LINK_VECTOR,item_links);
