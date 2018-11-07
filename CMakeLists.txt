@@ -19,6 +19,6 @@ add_subdirectory(opt)
 
 #create exe mpi
 add_executable(crawler crawlerMPI.cpp)
-target_link_libraries(crawler ${CPR_LIBRARIES} ${MPI_LIBRARIES}  "-lcurl -lboost_regex -lboost_mpi -lboost_serialization")
-set_target_properties(crawlerDIS PROPERTIES COMPILE_FLAGS ${O2_FLAG} LINK_FLAGS ${O2_FLAG})
+target_link_libraries(crawler ${CPR_LIBRARIES} ${MPI_LIBRARIES}  "-lcurl -lboost_mpi -lboost_serialization")
+set_target_properties(crawler PROPERTIES COMPILE_FLAGS ${O2_FLAG} LINK_FLAGS ${O2_FLAG})
 include_directories(${CPR_INCLUDE_DIRS})
