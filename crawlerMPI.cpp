@@ -215,12 +215,13 @@ int main(int argc, char** argv) {
                             if(std::regex_search(page, base_match, std::get<2>(*i))) {
                                 std::cerr << "AFTER1: " << world.rank() << std::endl;
                                 value = base_match[std::get<1>(*i)];
+                                std::cerr << "AFTER1: " << value << std::endl;
                             }else{
                                 value = "";
                                 std::cerr << "AFTER2: " << world.rank() << std::endl;
                             }
                             info += "\""+ key +"\":\"" + value + "\",";
-                            std::cerr << "AFTER3: " << world.rank() << std::endl;
+                            std::cerr << "AFTER3: " << world.rank() << info << std::endl;
                         }
                         info += "};";
                         res += info;
