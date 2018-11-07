@@ -206,10 +206,11 @@ int main(int argc, char** argv) {
                         
                         std::string info = "{";
                         info += "\"url\": \"" + *i + "\",";
-                        std::cerr << "BEFORE1:  " << world.rank() << std::endl;
+                        std::cerr << "BEFORE1.0:  " << world.rank() << std::endl;
                         for (auto i = info_page_regex.begin(); i != info_page_regex.end(); ++i){
                             std::cerr << "BEFORE1.1:  " << world.rank() << std::endl;
                             std::string key = std::get<0>(*i);
+                            std::cerr << "BEFORE1.2:  " << world.rank() << key << std::endl;
                             std::string value;// = getValueFromString(page, std::get<2>(*i), std::get<1>(*i));
                             std::smatch base_match;
                             // std::cerr << "BEFORE2:  " << world.rank() << std::endl;
@@ -217,8 +218,10 @@ int main(int argc, char** argv) {
                                 // std::cerr << "AFTER1: " << world.rank() << std::endl;
                                 value = base_match[std::get<1>(*i)];
                                 // std::cerr << "AFTER1: " << value << std::endl;
+                                std::cerr << "BEFORE1.3:  " << world.rank() << value << std::endl;
                             }else{
                                 value = "";
+                                std::cerr << "BEFORE1.3-  " << world.rank() << value << std::endl;
                                 // std::cerr << "AFTER2: " << world.rank() << std::endl;
                             }
                             info += "\""+ key +"\":\"" + value + "\",";
