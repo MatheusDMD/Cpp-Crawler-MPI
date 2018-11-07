@@ -203,17 +203,28 @@ int main(int argc, char** argv) {
                     localDownloadDuration += std::chrono::duration_cast<std::chrono::milliseconds>( download2T2 - download2T1 ).count();
 
                     std::chrono::high_resolution_clock::time_point process2T1 = std::chrono::high_resolution_clock::now(); 
-                        std::cerr << "BEFORE: " << world.rank() << std::endl;
+                        
                         std::string info = "{";
                         info += "\"url\": \"" + *i + "\",";
+                        std::cerr << "BEFORE1:  " << world.rank() << std::endl;
                         for (auto i = info_page_regex.begin(); i != info_page_regex.end(); ++i){
                             std::string key = std::get<0>(*i);
-                            std::string value = getValueFromString(page, std::get<2>(*i), std::get<1>(*i));
+                            std::string value;// = getValueFromString(page, std::get<2>(*i), std::get<1>(*i));
+                            std::smatch base_match;
+                            std::cerr << "BEFORE2:  " << world.rank() << std::endl;
+                            if(std::regex_search(page, base_match, std::get<2>(*i))) {
+                                std::cerr << "AFTER1: " << world.rank() << std::endl;
+                                value = base_match[std::get<1>(*i)];
+                            }else{
+                                value = "";
+                                std::cerr << "AFTER2: " << world.rank() << std::endl;
+                            }
                             info += "\""+ key +"\":\"" + value + "\",";
+                            std::cerr << "AFTER3: " << world.rank() << std::endl;
                         }
                         info += "};";
                         res += info;
-                        std::cerr << "AFTER: " << world.rank() << std::endl;
+                        std::cerr << "AFTER4: " << world.rank() << std::endl;
                     std::chrono::high_resolution_clock::time_point process2T2 = std::chrono::high_resolution_clock::now(); 
                     localProcessDuration += std::chrono::duration_cast<std::chrono::milliseconds>( process2T2 - process2T1 ).count();
                     std::cerr << "Page processed - RANK:" << world.rank() << std::endl;
