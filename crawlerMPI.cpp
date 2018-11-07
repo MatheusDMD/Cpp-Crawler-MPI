@@ -208,24 +208,28 @@ int main(int argc, char** argv) {
                         info += "\"url\": \"" + *i + "\",";
                         std::cerr << "BEFORE1:  " << world.rank() << std::endl;
                         for (auto i = info_page_regex.begin(); i != info_page_regex.end(); ++i){
+                            std::cerr << "BEFORE1.1:  " << world.rank() << std::endl;
                             std::string key = std::get<0>(*i);
                             std::string value;// = getValueFromString(page, std::get<2>(*i), std::get<1>(*i));
                             std::smatch base_match;
-                            std::cerr << "BEFORE2:  " << world.rank() << std::endl;
+                            // std::cerr << "BEFORE2:  " << world.rank() << std::endl;
                             if(std::regex_search(page, base_match, std::get<2>(*i))) {
-                                std::cerr << "AFTER1: " << world.rank() << std::endl;
+                                // std::cerr << "AFTER1: " << world.rank() << std::endl;
                                 value = base_match[std::get<1>(*i)];
-                                std::cerr << "AFTER1: " << value << std::endl;
+                                // std::cerr << "AFTER1: " << value << std::endl;
                             }else{
                                 value = "";
-                                std::cerr << "AFTER2: " << world.rank() << std::endl;
+                                // std::cerr << "AFTER2: " << world.rank() << std::endl;
                             }
                             info += "\""+ key +"\":\"" + value + "\",";
-                            std::cerr << "AFTER3: " << world.rank() << info << std::endl;
+                            // std::cerr << "AFTER3: " << world.rank() << info << std::endl;
                         }
                         info += "};";
+                        std::cerr << "BEFORE-AFTER4: " << world.rank() << std::endl;
+                        std::cerr << "AFTER4: " << res << std::endl;
                         res += info;
-                        std::cerr << "AFTER4: " << world.rank() << std::endl;
+                        std::cerr << "BEFORE-AFTER5: " << res << std::endl;
+                        std::cerr << "AFTER5: " << world.rank() << std::endl;
                     std::chrono::high_resolution_clock::time_point process2T2 = std::chrono::high_resolution_clock::now(); 
                     localProcessDuration += std::chrono::duration_cast<std::chrono::milliseconds>( process2T2 - process2T1 ).count();
                     std::cerr << "Page processed - RANK:" << world.rank() << std::endl;
