@@ -178,10 +178,10 @@ int main(int argc, char** argv) {
         totalDuration += std::chrono::duration_cast<std::chrono::milliseconds>( totalT2 - totalT1 ).count();
        
         std::cout << final_json << std::endl;
-        std::cerr << totalDuration << std::endl;
         std::cerr << totalDownloadDuration << std::endl;
         std::cerr << totalProcessDuration << std::endl;
-        std::cerr << totalDuration/totalCount << std::endl;
+        std::cerr << totalDuration << std::endl;
+        std::cerr << totalCount << std::endl;
 
     } else {
         std::vector<itemRegexType> info_page_regex = getItemInfoRegex();
