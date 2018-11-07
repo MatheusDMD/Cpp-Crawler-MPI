@@ -65,6 +65,18 @@ std::string getNextPageLink(std::string page, std::regex next_page_regex, std::r
 }
 
 
+std::string getItemInfo(std::string page, std::string url, std::vector<itemRegexType> info_page_regex){
+    std::string info = "{";
+    info += "\"url\": \"" + url + "\",";
+    for (auto i = info_page_regex.begin(); i != info_page_regex.end(); ++i){
+        std::string key = std::get<0>(*i);
+        std::string value = getValueFromString(page, std::get<2>(*i), std::get<1>(*i));
+        info += "\""+ key +"\":\"" + value + "\",";
+    }
+    info += "};";
+    return info;
+}
+
 std::vector<itemRegexType> getItemInfoRegex(){
     //get values from file!
     std::regex name_regex("<h1 class=\"product-name\">([^<]+)</h1>");
@@ -204,15 +216,7 @@ int main(int argc, char** argv) {
 
                     std::chrono::high_resolution_clock::time_point process2T1 = std::chrono::high_resolution_clock::now(); 
                         std::cerr << "BEFORE: " << world.rank() << std::endl;
-                        std::string info = "{";
-                        info += "\"url\": \"" + *i + "\",";
-                        for (auto i = info_page_regex.begin(); i != info_page_regex.end(); ++i){
-                            std::string key = std::get<0>(*i);
-                            std::string value = getValueFromString(page, std::get<2>(*i), std::get<1>(*i));
-                            info += "\""+ key +"\":\"" + value + "\",";
-                        }
-                        info += "};";
-                        res += info;
+                        res += getItemInfo(page, *i, info_page_regex);
                         std::cerr << "AFTER: " << world.rank() << std::endl;
                     std::chrono::high_resolution_clock::time_point process2T2 = std::chrono::high_resolution_clock::now(); 
                     localProcessDuration += std::chrono::duration_cast<std::chrono::milliseconds>( process2T2 - process2T1 ).count();

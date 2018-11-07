@@ -1,33 +1,24 @@
-cmake_minimum_required(VERSION 2.8.7)
-# project(cpr-example)
-find_package(MPI REQUIRED)
-find_package(Boost 1.4 COMPONENTS mpi serialization REQUIRED)
-include_directories(${MPI_INCLUDE_PATH})
+project(crawler)
+cmake_minimum_required(VERSION 2.8)
 
-if(NOT ${CMAKE_VERSION} LESS 3.2)
-    set(CMAKE_CXX_STANDARD 11)
-    set(CMAKE_CXX_STANDARD_REQUIRED ON)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
-else()
-    message(STATUS "Checking compiler flags for C++11 support.")
-    # Set C++11 support flags for various compilers
-    include(CheckCXXCompilerFlag)
-    check_cxx_compiler_flag("-std=c++11" COMPILER_SUPPORTS_CXX11)
-    if(COMPILER_SUPPORTS_CXX11)
-        message(STATUS "C++11 is supported.")
-        if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-            set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -stdlib=libc++")
-        else()
-            set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
-        endif()
-    else()
-        message(STATUS "The compiler ${CMAKE_CXX_COMPILER} has no C++11 support. Please use a different C++ compiler.")
-    endif()
-endif()
+set(CMAKE_CXX_STANDARD 11)
+set(O2_FLAG "-O2")
+
+# Point to our own cmake modules
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/CMakeModules)
+
+# Add global definitions
+add_definitions("-Wall")
+
+#Add MPI
+find_package(MPI REQUIRED)
+include_directories(${MPI_INCLUDE_PATH})
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
 add_subdirectory(opt)
 
 #create exe mpi
 add_executable(crawler crawlerMPI.cpp)
-target_link_libraries(crawler ${CPR_LIBRARIES} ${MPI_LIBRARIES}  ${Boost_LIBRARIES})
-include_directories(${CPR_INCLUDE_DIRS} ${JSON_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS})
+target_link_libraries(crawler ${CPR_LIBRARIES} ${MPI_LIBRARIES}  "-lcurl -lboost_regex -lboost_mpi -lboost_serialization")
+set_target_properties(crawlerDIS PROPERTIES COMPILE_FLAGS ${O2_FLAG} LINK_FLAGS ${O2_FLAG})
+include_directories(${CPR_INCLUDE_DIRS})
