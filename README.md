@@ -49,9 +49,11 @@ Run the command:
 ```
 mpiexec -n <N> -hostfile <hosts> ./crawler <website_url> 
 ```
-*N* - Number of processes running in all machines. For this program the number must be less than or equal to the number of products + 1 (because of master node)
-*hosts* - The file that contains the ip values for the machines in the cluster
-*website_url* - Is the URL to the Category page as describe in the section: "Valid URLs".
+
+- *N* - Number of processes running in all machines. For this program the number must be less than or equal to the number of products + 1 (because of master node)
+- *hosts* - The file that contains the ip values for the machines in the cluster
+
+- *website_url* - Is the URL to the Category page as describe in the section: "Valid URLs".
 
 ## Next-Steps
 

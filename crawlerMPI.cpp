@@ -206,9 +206,7 @@ int main(int argc, char** argv) {
                         
                         std::string info = "{";
                         info += "\"url\": \"" + *i + "\",";
-                        std::cerr << "BEFORE1.0:  " << world.rank() << std::endl;
                         for (auto i = info_page_regex.begin(); i != info_page_regex.end(); ++i){
-                            std::cerr << "BEFORE1.1:  " << world.rank() << std::endl;
                             std::string key = std::get<0>(*i);
                             std::string value = getValueFromString(page, std::get<2>(*i), std::get<1>(*i));
                             std::smatch base_match;
